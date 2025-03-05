@@ -1,47 +1,57 @@
 import logging
 
-# Logging configuration
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+# Konfiguracja
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-def addition(a, b):
-    return a + b
+def addition(*args):
+    return sum(args)
 
 def subtraction(a, b):
     return a - b
 
-def multiplication(a, b):
-    return a * b
+def multiplication(*args):
+    result = 1
+    for num in args:
+        result *= num
+    return result
 
 def division(a, b):
+    if b == 0:
+        raise ValueError("Division by zero is not allowed.")
     return a / b
 
+# Mapowanie inputu na funkcje
+operations = {
+    "1": ("Addition", addition),
+    "2": ("Subtraction", subtraction),
+    "3": ("Multiplication", multiplication),
+    "4": ("Division", division),
+}
+
 def calculator():
-    # Get the operation choice
-    operation = input("Enter the operation by using the corresponding number: 1 Addition, 2 Subtraction, 3 Multiplication, 4 Division: ")
 
-    # Get the operands
-    operand1 = float(input("Enter operand 1: "))
-    operand2 = float(input("Enter operand 2: "))
+    operation = input(
+        "Enter the operation by using the corresponding number:\n"
+        "1 Addition, 2 Subtraction, 3 Multiplication, 4 Division: "
+    )
 
-    # Perform the chosen operation
-    if operation == "1":
-        logging.info(f"Adding {operand1:.2f} and {operand2:.2f}")
-        result = addition(operand1, operand2)
-    elif operation == "2":
-        logging.info(f"Subtracting {operand2:.2f} from {operand1:.2f}")
-        result = subtraction(operand1, operand2)
-    elif operation == "3":
-        logging.info(f"Multiplying {operand1:.2f} and {operand2:.2f}")
-        result = multiplication(operand1, operand2)
-    elif operation == "4":
-        logging.info(f"Dividing {operand1:.2f} by {operand2:.2f}")
-        result = division(operand1, operand2)
-    else:
+    if operation not in operations:
         print("Invalid operation choice.")
         return
 
-    # Display the result
-    print(f"The result is {result:.2f}")
+    op_name, op_func = operations[operation]
 
-# Call the calculator function
-calculator()
+
+    if operation in ("1", "3"):  
+        numbers = list(map(float, input("Enter numbers separated by space: ").split()))
+    else:  
+        numbers = list(map(float, input("Enter operand 1 and operand 2 separated by space: ").split()))
+        if len(numbers) != 2:
+            print("Please enter exactly two numbers.")
+            return
+
+    logging.info(f"{op_name} of {', '.join(f'{num:.2f}' for num in numbers)}")
+    
+    try:
+        result = op_func(*numbers)
+       
