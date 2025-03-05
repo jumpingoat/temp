@@ -1,0 +1,76 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import re
+
+fatal_df = pd.read_csv('fatal-police-shootings-data.csv')
+
+# Konwersja kolumny 'date' do datetime
+fatal_df['date'] = pd.to_datetime(fatal_df['date'])
+
+# Pivot table
+pivot = pd.pivot_table(
+    fatal_df, 
+    index='race', 
+    columns='signs_of_mental_illness', 
+    aggfunc='size', 
+    fill_value=0
+)
+
+pivot['pct_mental_illness'] = pivot.get(True, 0) / pivot.sum(axis=1) * 100
+
+print("Pivot table – liczba ofiar wg rasy i oznak choroby psychicznej:")
+print(pivot)
+
+max_pct_race = pivot['pct_mental_illness'].idxmax()
+print(f"\nRasa z największym odsetkiem oznak choroby psychicznej: {max_pct_race}")
+
+fatal_df['weekday'] = fatal_df['date'].dt.day_name()
+weekday_counts = fatal_df['weekday'].value_counts()
+days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+weekday_counts = weekday_counts.reindex(days_order)
+
+print("\nLiczba interwencji wg dnia tygodnia:")
+print(weekday_counts)
+
+# Wykres
+plt.figure(figsize=(10,6))
+plt.bar(weekday_counts.index, weekday_counts.values)
+plt.xlabel('Dzień tygodnia')
+plt.ylabel('Liczba interwencji')
+plt.title('Interwencje policji wg dnia tygodnia')
+plt.show()
+
+# Pobranie danych populacji
+pop_tables = pd.read_html("https://simple.wikipedia.org/wiki/List_of_U.S._states_by_population")
+pop_df = pop_tables[0]
+
+pop_df.columns = pop_df.columns.str.strip()
+
+# Wyszukiwanie 
+pop_col_candidates = [col for col in pop_df.columns if "population" in str(col).lower()]
+if pop_col_candidates:
+    pop_col = pop_col_candidates[0]
+    # Usuwamy przecinki i konwertujemy wartości na int
+    pop_df[pop_col] = pop_df[pop_col].astype(str).str.replace(',', '').astype(int)
+    # Zmieniamy nazwę tej kolumny na 'Population'
+    pop_df = pop_df.rename(columns={pop_col: 'Population'})
+else:
+    raise Exception("Nie znaleziono kolumny zawierającej 'population' w danych populacji.")
+
+# Pobranie danych skrótów 
+abbr_tables = pd.read_html("https://en.wikipedia.org/wiki/List_of_U.S._state_and_territory_abbreviations")
+abbr_df = abbr_tables[2]
+abbr_df = abbr_df[['State', 'USPS Code']]
+abbr_df.columns = ['State', 'Abbreviation']
+
+# Łączenie danych
+pop_abbr_df = pd.merge(pop_df, abbr_df, on='State', how='left')
+merged_df = pd.merge(fatal_df, pop_abbr_df, left_on='state', right_on='Abbreviation', how='left')
+
+incidents_by_state = merged_df.groupby('State').size().reset_index(name='incidents')
+incidents_pop = pd.merge(incidents_by_state, pop_df[['State', 'Population']], on='State', how='left')
+
+# Incydenty na 1000 mieszkańców
+incidents_pop['incidents_per_1000'] = incidents_pop['incidents'] / incidents_pop['Population'] * 1000
+print("\nIncydenty na 1000 mieszkańców w poszczególnych stanach:")
+print(incidents_pop.sort_values('incidents_per_1000', ascending=False))
