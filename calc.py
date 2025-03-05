@@ -54,4 +54,10 @@ def calculator():
     
     try:
         result = op_func(*numbers)
+         print(f"The result is {result:.2f}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+# Call the calculator function
+calculator()
        
