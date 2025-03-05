@@ -1,0 +1,46 @@
+import sqlite3
+
+def create_database():
+    # Nawiązujemy połączenie z bazą (plik example.db zostanie utworzony, jeśli nie istnieje)
+    conn = sqlite3.connect('example.db')
+    # Włączamy sprawdzanie kluczy obcych (żeby nasi "pilnujący granic" działały)
+    conn.execute("PRAGMA foreign_keys = ON")
+    cursor = conn.cursor()
+    
+    # Tworzymy tabelę 'users'
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE
+    )
+    ''')
+    
+    # Tworzymy tabelę 'products'
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        price REAL NOT NULL
+    )
+    ''')
+    
+    # Tworzymy tabelę 'orders' z kluczami obcymi
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        order_date TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(product_id) REFERENCES products(id)
+    )
+    ''')
+    
+    # Zapisujemy zmiany i zamykamy połączenie
+    conn.commit()
+    conn.close()
+    print("Baza danych została utworzona.")
+
+if __name__ == '__main__':
+    create_database()
