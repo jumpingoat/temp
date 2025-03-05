@@ -1,0 +1,45 @@
+import pandas as pd
+import re
+
+df = pd.read_csv('/mnt/data/best_albumy.csv')
+
+# Zamiana nagłówków
+df.columns = ['TYTUŁ', 'ARTYSTA', 'ROK', 'MAX POZ']
+
+# Ilu pojedynczych artystów znajduje się na liście
+wzorzec_zespol = re.compile(r'(&| i |feat\.)', flags=re.IGNORECASE)
+solo_artysci = df[~df['ARTYSTA'].str.contains(wzorzec_zespol, na=False)]
+liczba_solo_artystow = solo_artysci['ARTYSTA'].nunique()
+
+# Najczęstsze zespoły
+zespoly = df[df['ARTYSTA'].str.contains(wzorzec_zespol, na=False)]
+czestosc_zespolow = zespoly['ARTYSTA'].value_counts()
+
+
+df.columns = [col.capitalize() for col in df.columns]  
+# Teraz nagłówki: 'Tytuł', 'Artysta', 'Rok', 'Max poz'
+
+df = df.drop(columns=['Max poz'])
+
+# W którym roku wyszło najwięcej albumów
+albumy_po_roku = df['Rok'].value_counts()
+rok_najwiecej_albumow = albumy_po_roku.idxmax()
+
+# Albumy między 1960 a 1990
+albumy_1960_1990 = df[(df['Rok'] >= 1960) & (df['Rok'] <= 1990)].shape[0]
+
+# Najnowszy album
+najmlodszy_album = df['Rok'].max()
+najwczesniejsze_albumy = df.sort_values('Rok').groupby('Artysta', as_index=False).first()
+
+# Zapis do pliku csv
+najwczesniejsze_albumy.to_csv('najwczesniej_wydane_albumy.csv', index=False)
+
+# Wyniki:
+print("Liczba pojedynczych artystów:", liczba_solo_artystow)
+print("\nNajczęściej pojawiające się zespoły:")
+print(czestosc_zespolow)
+print("\nRok, w którym wyszło najwięcej albumów:", rok_najwiecej_albumow)
+print("Liczba albumów wydanych między 1960 a 1990:", albumy_1960_1990)
+print("Rok wydania najmłodszego albumu:", najmlodszy_album)
+print("\nLista najwcześniej wydanych albumów każdego artysty została zapisana do pliku 'najwczesniej_wydane_albumy.csv'.")
