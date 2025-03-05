@@ -1,0 +1,47 @@
+import numpy as np
+import numpy_financial as npf
+import matplotlib.pyplot as plt
+
+# 1. Obliczenie orientacyjnej ceny mieszkania za 5 lat
+initial_price = 120000  # Cena mieszkania dziś [zł]
+annual_appreciation = 0.05  # 5% rocznie
+years = 5
+
+# Cena mieszkania po 5 latach przy rocznym składanym wzroście:
+final_house_price = initial_price * (1 + annual_appreciation)**years
+print(f"Orientacyjna cena mieszkania za 5 lat: {final_house_price:.2f} zł")
+# To około 153 153,60 zł – sporo do wywalczenia!
+
+# 2. Obliczenie miesięcznej wpłaty do lokaty
+# Bank oferuje nominalną stopę 12% rocznie przy kapitalizacji miesięcznej, czyli:
+monthly_rate = 0.12 / 12  # 1% miesięcznie
+months = years * 12  # 5 lat to 60 miesięcy
+
+# Funkcja pmt z numpy_financial.
+# Legenda: PV = 0, FV = -final_house_price (pożądana kwota)
+monthly_deposit = -npf.pmt(monthly_rate, months, 0, -final_house_price)
+print(f"Miesięczna wpłata: {monthly_deposit:.2f} zł")
+# Czyli ok. {monthly_deposit:.2f} zł miesięcznie.
+
+# 3. Wykres
+
+# Miesiące (od 0 do 60)
+months_array = np.arange(0, months + 1)
+
+# Cena mieszkania
+house_price_line = np.linspace(initial_price, final_house_price, months + 1)
+
+# Wartość lokaty
+# FV(n) = PMT * ((1 + i)^n - 1) / i; n to liczba miesięcy
+savings_value = monthly_deposit * ((1 + monthly_rate)**months_array - 1) / monthly_rate
+
+# Wynikowy wykres
+plt.figure(figsize=(10, 6))
+plt.plot(months_array, house_price_line, label="Cena mieszkania (liniowa)", marker='o', linestyle='--')
+plt.plot(months_array, savings_value, label="Wartość lokaty", marker='s')
+plt.xlabel("Miesiące")
+plt.ylabel("Kwota [zł]")
+plt.title("Porównanie ceny mieszkania i wartości lokaty przez 5 lat")
+plt.legend()
+plt.grid(True)
+plt.show()
