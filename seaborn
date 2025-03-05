@@ -1,0 +1,141 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Wczytanie danych
+df = pd.read_csv('HRDataset.csv')
+
+# Sprawdzenie dostępnych kolumn
+print("Dostępne kolumny:", df.columns.tolist())
+
+# 1. Zależność między przełożonym a PerformanceScore
+
+# Wyliczenie liczby pracowników przypisanych do każdego menadżera
+manager_counts = df['ManagerName'].value_counts()
+top_managers = manager_counts.head(10).index.tolist()
+
+# Filtrowanie danych tylko dla tych menadżerów
+df_top_managers = df[df['ManagerName'].isin(top_managers)]
+
+# Wizualizacja rozkładu kategorii ocen dla każdego menadżera
+plt.figure(figsize=(12,6))
+sns.countplot(x='ManagerName', hue='PerformanceScore', data=df_top_managers)
+plt.xlabel('Manager Name')
+plt.ylabel('Liczba pracowników')
+plt.title('Rozkład ocen wydajności pracowników według menadżerów')
+plt.xticks(rotation=45)
+plt.legend(title='Performance Score')
+plt.tight_layout()
+plt.show()
+
+# Analiza procentowa - dla każdego menadżera jaki procent pracowników ma poszczególne oceny
+perf_counts = df_top_managers.groupby(['ManagerName', 'PerformanceScore']).size().unstack(fill_value=0)
+perf_percentages = perf_counts.div(perf_counts.sum(axis=1), axis=0) * 100
+print("\nProcentowy udział poszczególnych ocen dla top 10 menadżerów:")
+print(perf_percentages)
+
+# 2. Źródła pozyskania pracownika a staż pracy
+
+# Sprawdzenie kolumny zawierającej staż
+if 'SpecialProjectsCount' in df.columns:
+    tenure_col = 'SpecialProjectsCount'
+else:
+    possible = [col for col in df.columns if 'tenure' in col.lower() or 'length' in col.lower() or 'special' in col.lower()]
+    if possible:
+        tenure_col = possible[0]
+    else:
+        tenure_col = None
+
+if tenure_col:
+    # Sprawdzenie czy wartości w kolumnie są numeryczne
+    if pd.api.types.is_numeric_dtype(df[tenure_col]):
+        avg_tenure_by_source = df.groupby('RecruitmentSource')[tenure_col].mean().sort_values(ascending=False)
+        print(f"\nŚrednia wartość {tenure_col} według źródła rekrutacji:")
+        print(avg_tenure_by_source)
+        
+        plt.figure(figsize=(10,6))
+        avg_tenure_by_source.plot(kind='bar', color='teal')
+        plt.xlabel('Recruitment Source')
+        plt.ylabel(f'Średnia wartość {tenure_col}')
+        plt.title(f'Średnia wartość {tenure_col} według źródła pozyskania')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+    else:
+        print(f"\nKolumna {tenure_col} nie zawiera wartości numerycznych.")
+        print("Przykładowe wartości:", df[tenure_col].head().tolist())
+else:
+    print("Nie znaleziono kolumny określającej staż pracowników.")
+
+# 3. Związek między stanem cywilnym a zadowoleniem z pracy
+
+# Sprawdzenie czy EmpSatisfaction jest numeryczne
+if pd.api.types.is_numeric_dtype(df['EmpSatisfaction']):
+    plt.figure(figsize=(10,6))
+    sns.boxplot(x='MaritalDesc', y='EmpSatisfaction', data=df)
+    plt.xlabel('Stan cywilny')
+    plt.ylabel('Zadowolenie z pracy')
+    plt.title('Zależność między stanem cywilnym a zadowoleniem z pracy')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+    # Obliczenie średniego zadowolenia dla poszczególnych stanów cywilnych
+    avg_sat_by_marital = df.groupby('MaritalDesc')['EmpSatisfaction'].mean()
+    print("\nŚrednie zadowolenie dla poszczególnych stanów cywilnych:")
+    print(avg_sat_by_marital)
+else:
+    # Jeśli EmpSatisfaction nie jest numeryczne, użyj analizy częstości
+    print("\nRozkład wartości EmpSatisfaction według stanu cywilnego:")
+    emp_sat_table = pd.crosstab(df['MaritalDesc'], df['EmpSatisfaction'])
+    print(emp_sat_table)
+
+# 4. Struktura wieku aktualnie zatrudnionych pracowników
+
+# Przekształcenie DOB na wiek, jeśli potrzebne
+if 'Age' not in df.columns and 'DOB' in df.columns:
+    df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce')
+    # Obliczenie wieku na podstawie daty urodzenia
+    today = pd.Timestamp.today()
+    df['Age'] = (today - df['DOB']).dt.days // 365
+
+# Histogram wieku
+if 'Age' in df.columns and pd.api.types.is_numeric_dtype(df['Age']):
+    plt.figure(figsize=(10,6))
+    plt.hist(df['Age'].dropna(), bins=20, edgecolor='black', color='skyblue')
+    plt.xlabel('Wiek')
+    plt.ylabel('Liczba pracowników')
+    plt.title('Struktura wieku pracowników')
+    plt.tight_layout()
+    plt.show()
+else:
+    print("Kolumna Age nie istnieje lub nie zawiera wartości numerycznych.")
+
+# 5. Czy starsi pracownicy pracują nad większą liczbą specjalnych projektów niż młodsi?
+
+# Sprawdzenie czy potrzebne kolumny są dostępne i numeryczne
+if 'Age' in df.columns and 'SpecialProjectsCount' in df.columns:
+    if pd.api.types.is_numeric_dtype(df['Age']) and pd.api.types.is_numeric_dtype(df['SpecialProjectsCount']):
+        plt.figure(figsize=(10,6))
+        plt.scatter(df['Age'], df['SpecialProjectsCount'], alpha=0.6, color='coral')
+        plt.xlabel('Wiek')
+        plt.ylabel('Liczba specjalnych projektów')
+        plt.title('Zależność między wiekiem a liczbą specjalnych projektów')
+        plt.tight_layout()
+        plt.show()
+
+        # Obliczenie współczynnika korelacji
+        corr = df[['Age', 'SpecialProjectsCount']].corr().iloc[0,1]
+        print(f"\nWspółczynnik korelacji między wiekiem a liczbą specjalnych projektów: {corr:.2f}")
+    else:
+        print("Kolumny Age lub SpecialProjectsCount nie zawierają wartości numerycznych.")
+else:
+    print("Brak kolumn Age lub SpecialProjectsCount w danych.")
+
+# Podsumowanie
+print("\nPodsumowanie analizy HR:")
+print("1. Analiza rozkładu ocen pracowników według menadżerów pokazuje, czy istnieją różnice w ocenianiu.")
+print("2. Analiza źródeł rekrutacji wskazuje, które źródła dają najlepsze rezultaty.")
+print("3. Zależność między stanem cywilnym a zadowoleniem może sugerować wpływ sytuacji osobistej na pracę.")
+print("4. Struktura wieku ukazuje demografię firmy.")
+print("5. Korelacja wieku i liczby projektów pokazuje, czy doświadczenie przekłada się na aktywność projektową.")
