@@ -1,0 +1,69 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+kghm = pd.read_csv('kgh_d.csv')
+copper = pd.read_csv('ca_c_f_d.csv')
+
+print("Kolumny w pliku kgh_d.csv:")
+print(kghm.columns.tolist())
+print("\nKolumny w pliku ca_c_f_d.csv:")
+print(copper.columns.tolist())
+
+date_col = 'Data' 
+close_col_kghm = 'Zamkniecie'
+close_col_copper = 'Zamkniecie'
+
+# Konwersja kolumny z datą do datetime
+kghm[date_col] = pd.to_datetime(kghm[date_col], errors='coerce')
+copper[date_col] = pd.to_datetime(copper[date_col], errors='coerce')
+
+# Sortujemy dane według daty
+kghm.sort_values(date_col, inplace=True)
+copper.sort_values(date_col, inplace=True)
+
+# Scalamy dane 
+merged = pd.merge(kghm[[date_col, close_col_kghm]], 
+                 copper[[date_col, close_col_copper]], 
+                 on=date_col, 
+                 suffixes=('_KGHM', '_Miedz'))
+
+
+merged.sort_values(date_col, inplace=True)
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, sharex=True, figsize=(12, 10))
+
+# Wykres 1
+ax1.plot(kghm[date_col], kghm[close_col_kghm], marker='o', linestyle='-', color='blue')
+ax1.set_title('Ceny zamknięcia akcji KGHM')
+ax1.set_ylabel('Cena (PLN)')
+
+# Wykres 2
+ax2.plot(copper[date_col], copper[close_col_copper], marker='o', linestyle='-', color='green')
+ax2.set_title('Ceny zamknięcia miedzi')
+ax2.set_ylabel('Cena (USD)')
+
+# Wykres 3
+ax3.axis('off')  
+ax3.axis('tight')
+
+merged_display = merged.copy()
+merged_display[date_col] = merged_display[date_col].dt.strftime('%Y-%m-%d')
+
+display_rows = min(15, len(merged_display))
+table_data = merged_display.head(display_rows).values
+table_cols = merged_display.columns
+
+table = ax3.table(cellText=table_data, 
+                 colLabels=table_cols, 
+                 loc='center')
+table.auto_set_font_size(False)
+table.set_fontsize(9)
+table.scale(1, 1.5)
+
+ax3.set_title('Tabela: Ceny zamknięcia KGHM i miedzi')
+
+# Obliczenie korelacji między cenami KGHM a cenami miedzi
+correlation = merged[f"{close_col_kghm}_KGHM"].corr(merged[f"{close_col_copper}_Miedz"])
+print(f"\nKorelacja między cenami KGHM a cenami miedzi: {correlation:.4f}")
+
+plt.tight_layout()
+plt.show()
