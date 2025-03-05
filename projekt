@@ -1,0 +1,133 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import joblib
+
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+# 1. Wczytanie danych
+data = pd.read_excel('default_of_credit_card_clients.xls', header=1)
+
+# 2. Definicja zmiennej celu i cech
+# Używamy dokładnej nazwy kolumny celu, jak w danych
+target_col = 'default payment next month'
+feature_cols = [col for col in data.columns if col not in ['ID', target_col]]
+
+# 3. Prosta eksploracja
+print(data.head())
+print(data.info())
+print(data.isnull().sum())
+
+# 4. Podział na zmienne kategoryczne i numeryczne
+# Zakładamy, że zmienne: SEX, EDUCATION i MARRIAGE są kategoryczne
+categorical = ['SEX', 'EDUCATION', 'MARRIAGE']
+numerical = [col for col in feature_cols if col not in categorical]
+
+# 5. Budowa pipeline’u przetwarzania danych
+num_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+cat_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+preprocessor = ColumnTransformer(transformers=[
+    ('num', num_transformer, numerical),
+    ('cat', cat_transformer, categorical)
+])
+
+# 6. Podział danych na zbiór treningowy i testowy (ze stratifikacją)
+X = data[feature_cols]
+y = data[target_col]
+X_train, X_test, y_train, y_test = train_test_split(X, y,
+                                                    stratify=y,
+                                                    test_size=0.2,
+                                                    random_state=42)
+
+# 7. Model baseline - DummyClassifier (strategia 'most_frequent')
+baseline = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('dummy', DummyClassifier(strategy='most_frequent'))
+])
+baseline.fit(X_train, y_train)
+y_pred_base = baseline.predict(X_test)
+print("Baseline Classifier")
+print(classification_report(y_test, y_pred_base))
+print("ROC AUC:", roc_auc_score(y_test, baseline.predict_proba(X_test)[:, 1]))
+
+# 8. Model: Regresja logistyczna
+logreg = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', LogisticRegression(max_iter=1000))
+])
+logreg.fit(X_train, y_train)
+y_pred_lr = logreg.predict(X_test)
+print("Logistic Regression")
+print(classification_report(y_test, y_pred_lr))
+print("ROC AUC:", roc_auc_score(y_test, logreg.predict_proba(X_test)[:, 1]))
+
+# 9. Model: Drzewo decyzyjne z GridSearchCV
+dt_pipe = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', DecisionTreeClassifier(random_state=42))
+])
+dt_params = {
+    'classifier__max_depth': [3, 5, 7, 10],
+    'classifier__min_samples_leaf': [5, 10, 15]
+}
+dt_grid = GridSearchCV(dt_pipe, dt_params, cv=5, scoring='roc_auc', n_jobs=-1)
+dt_grid.fit(X_train, y_train)
+y_pred_dt = dt_grid.predict(X_test)
+print("Decision Tree")
+print(classification_report(y_test, y_pred_dt))
+print("ROC AUC:", roc_auc_score(y_test, dt_grid.predict_proba(X_test)[:, 1]))
+
+# 10. Model: Random Forest z GridSearchCV
+rf_pipe = Pipeline(steps=[
+    ('preprocessor', preprocessor),
+    ('classifier', RandomForestClassifier(n_estimators=1000, random_state=42))
+])
+rf_params = {
+    'classifier__max_depth': [5, 7, 10],
+    'classifier__min_samples_leaf': [5, 10, 15]
+}
+rf_grid = GridSearchCV(rf_pipe, rf_params, cv=5, scoring='roc_auc', n_jobs=-1)
+rf_grid.fit(X_train, y_train)
+y_pred_rf = rf_grid.predict(X_test)
+print("Random Forest")
+print(classification_report(y_test, y_pred_rf))
+print("ROC AUC:", roc_auc_score(y_test, rf_grid.predict_proba(X_test)[:, 1]))
+
+# 11. Wizualizacja ROC Curve dla porównania modeli
+plt.figure(figsize=(10, 6))
+models = {
+    'Baseline': baseline,
+    'Logistic Regression': logreg,
+    'Decision Tree': dt_grid.best_estimator_,
+    'Random Forest': rf_grid.best_estimator_
+}
+for name, model in models.items():
+    y_prob = model.predict_proba(X_test)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    plt.plot(fpr, tpr, label=f'{name} (AUC = {roc_auc_score(y_test, y_prob):.2f})')
+plt.plot([0, 1], [0, 1], 'k--')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
+
+# 12. Zapis najlepszego modelu (wybieramy Random Forest)
+joblib.dump(rf_grid.best_estimator_, 'rf_model_credit_default.pkl')
+print("Model zapisany jako 'rf_model_credit_default.pkl'")
