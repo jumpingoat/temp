@@ -1,0 +1,84 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# -------------------------------
+# Wczytanie baz
+# -------------------------------
+  
+movies = pd.read_csv('tmdb_movies.csv')
+genres = pd.read_csv('tmdb_genres.csv')
+
+# Wyświetl kolumny z genres, żebyśmy wiedzieli, co tam jest
+print("Kolumny w genres:", genres.columns.tolist())
+
+# -------------------------------
+# Lista 10 najwyżej ocenianych filmów (vote_average), których vote_count > 3. kwartyla rozkładu vote_count.
+# -------------------------------
+  
+q3 = movies['vote_count'].quantile(0.75)
+filtered_movies = movies[movies['vote_count'] > q3]
+top10_movies = filtered_movies.sort_values('vote_average', ascending=False).head(10)
+print("Top 10 filmów (vote_average) z vote_count > 3. kwartyla:")
+print(top10_movies[['title', 'vote_average', 'vote_count']])
+
+# -------------------------------
+# Średni przychód i budżet w danym roku dla filmów od 2010 do 2016 oraz wykres – kolumnowy dla przychodu, liniowy dla budżetu.
+# -------------------------------
+  
+movies['release_date'] = pd.to_datetime(movies['release_date'], errors='coerce')
+movies['year'] = movies['release_date'].dt.year
+
+movies_2010_2016 = movies[(movies['year'] >= 2010) & (movies['year'] <= 2016)]
+grouped = movies_2010_2016.groupby('year').agg({'revenue': 'mean', 'budget': 'mean'}).reset_index()
+
+fig, ax1 = plt.subplots(figsize=(10,6))
+bars = ax1.bar(grouped['year'], grouped['revenue'], width=0.5, label='Średni przychód', color='skyblue')
+ax1.set_xlabel('Rok')
+ax1.set_ylabel('Średni przychód', color='blue')
+ax1.tick_params(axis='y', labelcolor='blue')
+
+ax2 = ax1.twinx()
+line = ax2.plot(grouped['year'], grouped['budget'], marker='o', color='red', label='Średni budżet')
+ax2.set_ylabel('Średni budżet', color='red')
+ax2.tick_params(axis='y', labelcolor='red')
+
+lines, labels = ax1.get_legend_handles_labels()
+lines2, labels2 = ax2.get_legend_handles_labels()
+ax1.legend(lines + lines2, labels + labels2, loc='upper left', bbox_to_anchor=(1.05, 1))
+
+plt.title('Średni przychód i budżet filmów (2010-2016)')
+plt.tight_layout()
+plt.show()
+
+# -------------------------------
+# Połączenie bazy filmów z bazą gatunków i analiza gatunków
+# -------------------------------
+
+movies_with_genres = pd.merge(
+    movies, 
+    genres, 
+    left_on='genre_id', 
+    right_on='Unnamed: 0', 
+    how='left'
+)
+
+# Najczęściej występujący gatunek
+genre_counts = movies_with_genres['genres'].value_counts()
+most_common_genre = genre_counts.idxmax()
+count_most_common = genre_counts.max()
+print(f"\nNajczęściej występujący gatunek: {most_common_genre}, liczba filmów: {count_most_common}")
+
+# Gatunek, którego filmy trwają średnio najdłużej
+mean_runtime_by_genre = movies_with_genres.groupby('genres')['runtime'].mean().sort_values(ascending=False)
+genre_longest_runtime = mean_runtime_by_genre.idxmax()
+longest_runtime = mean_runtime_by_genre.max()
+print(f"\nGatunek z najdłuższym średnim czasem trwania: {genre_longest_runtime} ({longest_runtime:.2f} minut)")
+
+# Histogram czasu trwania filmów 
+subset = movies_with_genres[movies_with_genres['genres'] == genre_longest_runtime]
+plt.figure(figsize=(10,6))
+plt.hist(subset['runtime'].dropna(), bins=20, edgecolor='black')
+plt.xlabel('Czas trwania (minuty)')
+plt.ylabel('Liczba filmów')
+plt.title(f'Histogram czasu trwania filmów: {genre_longest_runtime}')
+plt.show()
