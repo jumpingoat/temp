@@ -1,0 +1,29 @@
+import sqlite3
+import pandas as pd
+
+def create_database():
+    # Wczytanie danych z plików CSV
+    stations_df = pd.read_csv("clean_stations.csv")
+    measure_df = pd.read_csv("clean_measure.csv")
+    
+    # Połączenie z bazą danych
+    conn = sqlite3.connect("stations_measure.db")
+    # Włączamy obsługę kluczy obcych (dla pewności, że nasza baza wie, co jest ważne)
+    conn.execute("PRAGMA foreign_keys = ON")
+    
+    # Zapis danych do tabel w bazie danych
+    stations_df.to_sql("stations", conn, if_exists="replace", index=False)
+    measure_df.to_sql("measure", conn, if_exists="replace", index=False)
+    
+    # Wyświetlenie pierwszych 5 rekordów z tabeli stations dla testu
+    results = conn.execute("SELECT * FROM stations LIMIT 5").fetchall()
+    print("Pierwsze 5 rekordów z tabeli stations:")
+    for row in results:
+        print(row)
+    
+    conn.commit()
+    conn.close()
+    print("Baza danych została utworzona.")
+
+if __name__ == '__main__':
+    create_database()
